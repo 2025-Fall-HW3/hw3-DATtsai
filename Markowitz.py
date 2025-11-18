@@ -62,7 +62,10 @@ class EqualWeightPortfolio:
         """
         TODO: Complete Task 1 Below
         """
-
+        for index in self.portfolio_weights.index:
+            for col in assets:
+                self.portfolio_weights.loc[index][col] = 1/len(assets)
+            self.portfolio_weights.loc[index][self.exclude] = 0
         """
         TODO: Complete Task 1 Above
         """
@@ -88,6 +91,10 @@ class EqualWeightPortfolio:
         if not hasattr(self, "portfolio_returns"):
             self.calculate_portfolio_returns()
 
+        # print('weight matrix: 1/len(assets)')
+        # print(self.portfolio_weights)
+        # print('returns: ')
+        # print(self.portfolio_returns)
         return self.portfolio_weights, self.portfolio_returns
 
 
