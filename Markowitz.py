@@ -62,7 +62,10 @@ class EqualWeightPortfolio:
         """
         TODO: Complete Task 1 Below
         """
-
+        for index in self.portfolio_weights.index:
+            for col in assets:
+                self.portfolio_weights.loc[index][col] = 1/len(assets)
+            self.portfolio_weights.loc[index][self.exclude] = 0
         """
         TODO: Complete Task 1 Above
         """
@@ -88,6 +91,10 @@ class EqualWeightPortfolio:
         if not hasattr(self, "portfolio_returns"):
             self.calculate_portfolio_returns()
 
+        # print('weight matrix: 1/len(assets)')
+        # print(self.portfolio_weights)
+        # print('returns: ')
+        # print(self.portfolio_returns)
         return self.portfolio_weights, self.portfolio_returns
 
 
@@ -114,7 +121,16 @@ class RiskParityPortfolio:
         TODO: Complete Task 2 Below
         """
 
-
+        for index in range(len(self.portfolio_weights.index)):
+            if index - 1 < self.lookback: # 經測試發現第一筆資料(2019-01-02)不被採用
+                self.portfolio_weights.iloc[index] = 0
+                continue
+            std = df_returns.iloc[(index - self.lookback):index].std()
+            std.replace(0, np.nan, inplace=True)
+            inverse_std = 1 / std
+            for col in assets:
+                self.portfolio_weights.iloc[index][col] = inverse_std[col] / (inverse_std.sum() - inverse_std[self.exclude])
+            self.portfolio_weights.iloc[index][self.exclude] = 0
 
         """
         TODO: Complete Task 2 Above
@@ -142,6 +158,10 @@ class RiskParityPortfolio:
         if not hasattr(self, "portfolio_returns"):
             self.calculate_portfolio_returns()
 
+        # print('weight matrix: (1/std_i) / sum_1/std')
+        # print(self.portfolio_weights)
+        # print('returns: ')
+        # print(self.portfolio_returns)
         return self.portfolio_weights, self.portfolio_returns
 
 
@@ -175,23 +195,29 @@ class MeanVariancePortfolio:
         self.portfolio_weights.fillna(0, inplace=True)
 
     def mv_opt(self, R_n, gamma):
-        Sigma = R_n.cov().values
-        mu = R_n.mean().values
-        n = len(R_n.columns)
+        Sigma = R_n.cov().values # 資產之間的共變矩陣
+        mu = R_n.mean().values # 各資產的平均報酬率
+        n = len(R_n.columns) # 資產數量
 
         with gp.Env(empty=True) as env:
-            env.setParam("OutputFlag", 0)
-            env.setParam("DualReductions", 0)
+            env.setParam("OutputFlag", 0) # log輸出設定 https://docs.gurobi.com/projects/optimizer/en/current/reference/parameters.html#parameteroutputflag
+            env.setParam("DualReductions", 0) # 雙重化約停用 https://docs.gurobi.com/projects/optimizer/en/current/reference/parameters.html#dualreductions
             env.start()
-            with gp.Model(env=env, name="portfolio") as model:
+            with gp.Model(env=env, name="portfolio") as model: # https://docs.gurobi.com/projects/examples/en/current/overview/building.html
                 """
                 TODO: Complete Task 3 Below
                 """
 
                 # Sample Code: Initialize Decision w and the Objective
                 # NOTE: You can modify the following code
-                w = model.addMVar(n, name="w", ub=1)
-                model.setObjective(w.sum(), gp.GRB.MAXIMIZE)
+                w = model.addMVar(n, name="w", ub=1) # 矩陣變數 name:變數命名 ub:變數上界 https://docs.gurobi.com/projects/optimizer/en/current/reference/python/model.html#Model.addMVar
+
+                risk_and_aversion = 0.5 * gamma * (w.T @ Sigma @ w) # @ 矩陣乘法
+                expected_return = w.T @ mu
+                model.setObjective(expected_return - risk_and_aversion, gp.GRB.MAXIMIZE) # 目標式 https://docs.gurobi.com/projects/optimizer/en/current/reference/python/model.html#Model.setObjective
+                model.addConstr(w.sum() == 1) # 限制式 https://docs.gurobi.com/projects/optimizer/en/current/reference/python/model.html#Model.addConstr
+                model.addConstr(w >= 0)
+                model.optimize() # https://docs.gurobi.com/projects/optimizer/en/current/reference/python/model.html#Model.optimize
 
                 """
                 TODO: Complete Task 3 Above
@@ -239,6 +265,10 @@ class MeanVariancePortfolio:
         if not hasattr(self, "portfolio_returns"):
             self.calculate_portfolio_returns()
 
+        # print('weight matrix: max_w(expected return - risk and aversion)')
+        # print(self.portfolio_weights)
+        # print('returns: ')
+        # print(self.portfolio_returns)
         return self.portfolio_weights, self.portfolio_returns
 
 
