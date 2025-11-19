@@ -121,7 +121,16 @@ class RiskParityPortfolio:
         TODO: Complete Task 2 Below
         """
 
-
+        for index in range(len(self.portfolio_weights.index)):
+            if index - 1 < self.lookback: # 經測試發現第一筆資料(2019-01-02)不被採用
+                self.portfolio_weights.iloc[index] = 0
+                continue
+            std = df_returns.iloc[(index - self.lookback):index].std()
+            std.replace(0, np.nan, inplace=True)
+            inverse_std = 1 / std
+            for col in assets:
+                self.portfolio_weights.iloc[index][col] = inverse_std[col] / (inverse_std.sum() - inverse_std[self.exclude])
+            self.portfolio_weights.iloc[index][self.exclude] = 0
 
         """
         TODO: Complete Task 2 Above
@@ -149,6 +158,10 @@ class RiskParityPortfolio:
         if not hasattr(self, "portfolio_returns"):
             self.calculate_portfolio_returns()
 
+        # print('weight matrix: (1/std_i) / sum_1/std')
+        # print(self.portfolio_weights)
+        # print('returns: ')
+        # print(self.portfolio_returns)
         return self.portfolio_weights, self.portfolio_returns
 
 
