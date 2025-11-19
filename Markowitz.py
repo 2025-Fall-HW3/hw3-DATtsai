@@ -195,23 +195,29 @@ class MeanVariancePortfolio:
         self.portfolio_weights.fillna(0, inplace=True)
 
     def mv_opt(self, R_n, gamma):
-        Sigma = R_n.cov().values
-        mu = R_n.mean().values
-        n = len(R_n.columns)
+        Sigma = R_n.cov().values # 資產之間的共變矩陣
+        mu = R_n.mean().values # 各資產的平均報酬率
+        n = len(R_n.columns) # 資產數量
 
         with gp.Env(empty=True) as env:
-            env.setParam("OutputFlag", 0)
-            env.setParam("DualReductions", 0)
+            env.setParam("OutputFlag", 0) # log輸出設定 https://docs.gurobi.com/projects/optimizer/en/current/reference/parameters.html#parameteroutputflag
+            env.setParam("DualReductions", 0) # 雙重化約停用 https://docs.gurobi.com/projects/optimizer/en/current/reference/parameters.html#dualreductions
             env.start()
-            with gp.Model(env=env, name="portfolio") as model:
+            with gp.Model(env=env, name="portfolio") as model: # https://docs.gurobi.com/projects/examples/en/current/overview/building.html
                 """
                 TODO: Complete Task 3 Below
                 """
 
                 # Sample Code: Initialize Decision w and the Objective
                 # NOTE: You can modify the following code
-                w = model.addMVar(n, name="w", ub=1)
-                model.setObjective(w.sum(), gp.GRB.MAXIMIZE)
+                w = model.addMVar(n, name="w", ub=1) # 矩陣變數 name:變數命名 ub:變數上界 https://docs.gurobi.com/projects/optimizer/en/current/reference/python/model.html#Model.addMVar
+
+                risk_and_aversion = 0.5 * gamma * (w.T @ Sigma @ w) # @ 矩陣乘法
+                expected_return = w.T @ mu
+                model.setObjective(expected_return - risk_and_aversion, gp.GRB.MAXIMIZE) # 目標式 https://docs.gurobi.com/projects/optimizer/en/current/reference/python/model.html#Model.setObjective
+                model.addConstr(w.sum() == 1) # 限制式 https://docs.gurobi.com/projects/optimizer/en/current/reference/python/model.html#Model.addConstr
+                model.addConstr(w >= 0)
+                model.optimize() # https://docs.gurobi.com/projects/optimizer/en/current/reference/python/model.html#Model.optimize
 
                 """
                 TODO: Complete Task 3 Above
@@ -259,6 +265,10 @@ class MeanVariancePortfolio:
         if not hasattr(self, "portfolio_returns"):
             self.calculate_portfolio_returns()
 
+        # print('weight matrix: max_w(expected return - risk and aversion)')
+        # print(self.portfolio_weights)
+        # print('returns: ')
+        # print(self.portfolio_returns)
         return self.portfolio_weights, self.portfolio_returns
 
 
