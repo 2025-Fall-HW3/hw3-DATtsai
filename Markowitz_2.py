@@ -51,7 +51,7 @@ class MyPortfolio:
     NOTE: You can modify the initialization function
     """
 
-    def __init__(self, price, exclude, lookback=50, gamma=0):
+    def __init__(self, price, exclude, lookback=20, gamma=0):
         self.price = price
         self.returns = price.pct_change().fillna(0)
         self.exclude = exclude
@@ -70,7 +70,55 @@ class MyPortfolio:
         """
         TODO: Complete Task 4 Below
         """
-        
+
+        def normalize(x):
+            mx, mn = np.nanmax(x), np.nanmin(x)
+            if mx != mn:
+                return (x - mn) / (mx - mn)
+            else:
+                return np.zeros(len(x))
+
+        R_n = self.returns[assets]
+        w = np.ones(len(assets)) / len(assets)
+
+        for i in range(self.lookback, len(self.price)):
+            
+            R_window = R_n.iloc[i - self.lookback : i]
+            R_mean = R_window.mean().values
+            R_mean_positive = np.where(R_mean > 0, R_mean, 0)
+            R_std = np.where(R_window.std().values < 1e-9, 1e-9, R_window.std().values)
+            R_mean_positive_std = np.where(R_mean > 0, R_std, 1e-9)
+            inverse_R_std = 1 / R_std
+            inverse_R_mean_positive_std = np.where(R_mean_positive_std > 0, 1 / R_mean_positive_std, 0)
+            R_residual = R_mean - R_mean.mean()
+            R_residual_std = R_residual.std()
+            penalty = R_std / R_std.mean()
+            between_std = R_std - R_residual_std
+
+            # 定義score
+            # score = R_mean / R_std # sharp ratio like
+            # score = score / penalty
+            # score = 1 / R_std
+            # score = inverse_R_std / inverse_R_std.sum()
+            # score = R_mean * (1/penalty) / R_residual_std
+            # score = 1 / (R_std - R_residual_std)
+            # score = R_residual / penalty
+            # score = np.where(score > 0, score, 0) * (-between_std)
+            score = R_mean_positive / R_mean_positive_std
+            # score = 0.4 * normalize(R_mean_positive) + 0.6 * normalize(inverse_R_mean_positive_std) # + 0.05 * normalize(R_residual) + 0.05 * normalize(-between_std)
+            
+            score = normalize(score)
+            w = score
+            
+            if w.sum() == 0:
+                # w = np.ones(len(assets)) / len(assets)
+                w = np.zeros(len(assets))
+            else:
+                w = w / w.sum() # 除以總和做正規化
+                # w = np.minimum(w, 0.3) # 最大權重限制
+                # w = w / w.sum()
+
+            self.portfolio_weights.loc[self.price.index[i], assets] = w
         
         """
         TODO: Complete Task 4 Above
@@ -97,7 +145,11 @@ class MyPortfolio:
         # Ensure portfolio returns are calculated
         if not hasattr(self, "portfolio_returns"):
             self.calculate_portfolio_returns()
-
+        
+        # print('weight matrix: boosting weight')
+        # print(self.portfolio_weights)
+        # print('returns: ')
+        # print(self.portfolio_returns)
         return self.portfolio_weights, self.portfolio_returns
 
 
